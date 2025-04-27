@@ -1,11 +1,10 @@
 import streamlit as st
-import openai  # Using older version syntax (0.28.0)
 import requests
+import json
 from PIL import Image, ImageDraw
 import io
 import base64
 from datetime import datetime
-import os
 
 # Set page configuration
 st.set_page_config(
@@ -57,23 +56,31 @@ def create_mandala_prompt(inspiration):
     """
     return prompt.strip()
 
-# Function to generate the mandala image using DALL-E 3
+# Function to generate the mandala image using DALL-E 3 via direct API call
 def generate_mandala_image(api_key, prompt):
-    # Set the API key
-    openai.api_key = api_key
+    url = "https://api.openai.com/v1/images/generations"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}"
+    }
+    payload = {
+        "model": "dall-e-3",
+        "prompt": prompt,
+        "size": "1024x1024",
+        "quality": "standard",
+        "n": 1
+    }
     
     try:
-        # Generate image with DALL-E 3
-        response = openai.Image.create(
-            model="dall-e-3",
-            prompt=prompt,
-            size="1024x1024",
-            quality="standard",
-            n=1,
-        )
+        response = requests.post(url, headers=headers, json=payload)
+        response_data = response.json()
+        
+        if "error" in response_data:
+            st.error(f"Error from OpenAI API: {response_data['error']['message']}")
+            return None
         
         # Get the image URL
-        image_url = response['data'][0]['url']
+        image_url = response_data['data'][0]['url']
         
         # Download the image
         image_response = requests.get(image_url)
@@ -127,6 +134,8 @@ if 'framed_images' not in st.session_state:
     st.session_state.framed_images = {}
 if 'selected_frame' not in st.session_state:
     st.session_state.selected_frame = "Classic Wood"
+if 'inspiration' not in st.session_state:
+    st.session_state.inspiration = ""
 
 # Title and description
 st.title("✨ Inspirational Mandala Generator")
@@ -143,15 +152,18 @@ with st.sidebar:
     api_key = st.text_input("Enter your OpenAI API key", type="password", help="Your API key is required to use DALL-E 3")
     
     # Input for the inspiration word
-    inspiration = st.text_input("Enter a word for inspiration:", placeholder="love, wisdom, harmony, etc.")
+    inspiration_input = st.text_input("Enter a word for inspiration:", placeholder="love, wisdom, harmony, etc.")
     
     # Generate button
     generate_button = st.button("Generate Mandala")
     
-    if generate_button and inspiration and api_key:
+    if generate_button and inspiration_input and api_key:
         with st.spinner("Generating your mandala art..."):
+            # Store the inspiration
+            st.session_state.inspiration = inspiration_input
+            
             # Create prompt for DALL-E
-            prompt = create_mandala_prompt(inspiration)
+            prompt = create_mandala_prompt(inspiration_input)
             
             # Generate the image
             image = generate_mandala_image(api_key, prompt)
@@ -175,7 +187,7 @@ if st.session_state.mandala_image is not None:
         # Display the framed image
         st.image(
             st.session_state.framed_images[st.session_state.selected_frame],
-            caption=f'"{inspiration}" Mandala with {st.session_state.selected_frame} frame',
+            caption=f'"{st.session_state.inspiration}" Mandala with {st.session_state.selected_frame} frame',
             use_column_width=True
         )
     
@@ -215,7 +227,7 @@ if st.session_state.mandala_image is not None:
         st.markdown(
             get_image_download_link(
                 st.session_state.framed_images[st.session_state.selected_frame],
-                f"mandala_{inspiration}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
+                f"mandala_{st.session_state.inspiration}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
                 "Download Mandala"
             ),
             unsafe_allow_html=True
@@ -223,7 +235,7 @@ if st.session_state.mandala_image is not None:
         
         # Display inspiration details
         st.markdown("### Inspiration Details")
-        st.markdown(f"**Word:** {inspiration}")
+        st.markdown(f"**Word:** {st.session_state.inspiration}")
         st.markdown("**Colors Used:** 3 shades of blue and 3 shades of gray")
 
 else:
