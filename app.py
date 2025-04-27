@@ -1,5 +1,5 @@
 import streamlit as st
-from openai import OpenAI
+import openai  # Using older version syntax (0.28.0)
 import requests
 from PIL import Image, ImageDraw
 import io
@@ -59,12 +59,12 @@ def create_mandala_prompt(inspiration):
 
 # Function to generate the mandala image using DALL-E 3
 def generate_mandala_image(api_key, prompt):
-    # Initialize the OpenAI client with the API key
-    client = OpenAI(api_key=api_key)
+    # Set the API key
+    openai.api_key = api_key
     
     try:
         # Generate image with DALL-E 3
-        response = client.images.generate(
+        response = openai.Image.create(
             model="dall-e-3",
             prompt=prompt,
             size="1024x1024",
@@ -72,8 +72,8 @@ def generate_mandala_image(api_key, prompt):
             n=1,
         )
         
-        # Get the image URL from the response
-        image_url = response.data[0].url
+        # Get the image URL
+        image_url = response['data'][0]['url']
         
         # Download the image
         image_response = requests.get(image_url)
